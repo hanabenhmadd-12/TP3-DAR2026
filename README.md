@@ -10,8 +10,9 @@
 | **Étudiante** | Hana Ben Hmad |
 | **Enseignante des TPs** | Zeineb Daoud |
 | **Responsable du cours** | Amal Abid |
-| **Langage** | Java (JDK 25) |
+| **Langage** | Java (JDK 25, compatible JDK 8+) |
 | **Environnement** | IntelliJ IDEA |
+| **Répertoire de travail** | `benhmadhana_LSI3_DevAppReparties` |
 
 ---
 
@@ -48,6 +49,7 @@ TP3-DAR2026/
 │   ├── ClientHandler.java   # Thread de communication avec un client
 │   └── Client.java          # Client Java TCP
 ├── images/                  # Captures d'écran des tests
+├── .gitignore
 └── README.md
 ```
 
@@ -55,7 +57,7 @@ TP3-DAR2026/
 |---|---|
 | `Server` | Écoute sur le port **1234**, accepte les connexions, incrémente le compteur de clients, affiche l'IP du client via `getRemoteSocketAddress()` et lance un `ClientHandler` |
 | `ClientHandler` | Hérite de `Thread`. Envoie le numéro d'ordre au client, puis renvoie en écho chaque message reçu. La commande `quit` ferme la session |
-| `Client` | Se connecte au serveur (`localhost:1234` par défaut, ou IP et port passés en arguments) et gère l'envoi et la réception en parallèle |
+| `Client` | Se connecte au serveur (`localhost:1234` par défaut, ou IP et port passés en arguments) avec `InetAddress` et `InetSocketAddress`, et gère l'envoi et la réception en parallèle |
 
 ---
 
@@ -73,6 +75,32 @@ TP3-DAR2026/
 3. Le thread `ClientHandler` dialogue avec son client, ce qui libère le serveur pour accepter immédiatement le client suivant.
 4. Les clients sont traités indépendamment : un client lent ou bloqué n'empêche pas les autres de communiquer.
 
+**Boucle principale du serveur (`Server.java`) :**
+
+```java
+Socket socket = serverSocket.accept();
+clientCount++;
+System.out.println("Client n°" + clientCount + " connecté, IP : "
+        + socket.getRemoteSocketAddress());
+new ClientHandler(socket, clientCount).start();
+```
+
+**Connexion du client avec une adresse IP paramétrable (`Client.java`) :**
+
+```java
+String host = args.length > 0 ? args[0] : "localhost";
+int port = args.length > 1 ? Integer.parseInt(args[1]) : 1234;
+
+InetAddress address = InetAddress.getByName(host);
+socket.connect(new InetSocketAddress(address, port), 5000);
+```
+
+**Message envoyé à chaque client (`ClientHandler.java`) :**
+
+```java
+out.println("Bienvenue ! Vous etes le client numero " + clientNumber);
+```
+
 ---
 
 ## 4. Compilation et exécution
@@ -82,19 +110,20 @@ TP3-DAR2026/
 ```bash
 # Compilation
 cd src
-javac *.java
+javac -encoding UTF-8 *.java
 
 # 1. Lancer le serveur
 java Server
 
 # 2. Lancer un ou plusieurs clients Java (autres terminaux)
 java Client                       # serveur local (localhost:1234)
-java Client 192.168.1.20 1234     # serveur distant (IP et port)
+java Client 192.168.1.17 1234     # serveur désigné par son IP et son port
 
 # 3. Ou utiliser Telnet
 telnet localhost 1234
 ```
 
+Pour afficher correctement les accents dans la console Windows, lancer `chcp 65001` avant `java`.
 Pour se déconnecter, taper `quit` dans le client.
 
 ---
@@ -121,6 +150,30 @@ Deux clients Telnet sont connectés simultanément au serveur (`telnet localhost
 
 ![Clients Telnet](images/04_telnet.jpg)
 
+### 5.5 Test avec l'adresse IP réseau
+Faute de seconde machine physique, le test a été réalisé sur une seule machine en utilisant son adresse IP réseau (`192.168.1.17`, obtenue avec `ipconfig`) à la place de `localhost`, avec plusieurs clients Java et un client Telnet simultanés :
+
+```
+java Client 192.168.1.17 1234
+telnet 192.168.1.17 1234
+```
+
+Le serveur affiche l'adresse IP réelle des clients (`/192.168.1.17:port`) et non plus `[0:0:0:0:0:0:0:1]`, avec leur numéro d'ordre.
+
+**Côté serveur** (trois clients connectés simultanément) :
+
+![Serveur - connexions par IP réseau](images/05_reseau_serveur.png)
+
+**Client Java** (client n°2) :
+
+![Client Java - IP réseau](images/06_reseau_client.png)
+
+**Client Telnet** (client n°3) :
+
+![Client Telnet - IP réseau](images/07_reseau_telnet_ip.png)
+
+> **Limite :** un test avec une seconde machine physique (téléphone ou autre PC) n'a pas pu être finalisé : la connexion a été bloquée par la configuration du réseau et du pare-feu. Le client Java est néanmoins prêt pour ce scénario grâce à `InetAddress` et `InetSocketAddress` : il suffit de lancer `java Client <IP_du_serveur> 1234`.
+
 ### Récapitulatif
 
 | Test | Résultat |
@@ -130,8 +183,10 @@ Deux clients Telnet sont connectés simultanément au serveur (`telnet localhost
 | Plusieurs clients Telnet simultanés | Réussi |
 | Affichage de l'IP et du numéro d'ordre côté serveur | Réussi |
 | Envoi du numéro d'ordre à chaque client | Réussi |
+| Clients Java et Telnet via l'IP réseau (192.168.1.17) | Réussi |
+| Test avec une seconde machine physique | Non réalisé |
 
-> **Remarque :** en local, l'adresse du client s'affiche en IPv6 (`/[0:0:0:0:0:0:0:1]:port`), ce qui correspond à `localhost`.
+> **Remarque :** en local (`localhost`), l'adresse du client s'affiche en IPv6 (`/[0:0:0:0:0:0:0:1]:port`). Avec l'IP réseau, elle s'affiche en IPv4 (`/192.168.1.17:port`).
 
 ---
 
@@ -139,11 +194,12 @@ Deux clients Telnet sont connectés simultanément au serveur (`telnet localhost
 
 Dans cette activité, j'ai transformé le serveur mono-client en **serveur multi-threads**. Le serveur boucle sur `accept()` et, pour chaque connexion, incrémente un compteur et crée un thread `ClientHandler` qui dialogue avec ce client. Les clients sont ainsi traités simultanément, sans se bloquer les uns les autres.
 
-Côté serveur, l'adresse IP de chaque client est affichée avec `getRemoteSocketAddress()`, ainsi que son numéro d'ordre de connexion. Chaque client reçoit également son numéro d'ordre.
+Côté serveur, l'adresse IP de chaque client est affichée avec `getRemoteSocketAddress()`, ainsi que son numéro d'ordre de connexion. Chaque client reçoit également son numéro d'ordre. Le compteur `clientCount` n'est modifié que par le thread principal (celui de `accept()`), il n'y a donc pas d'accès concurrent à cette variable.
 
-Les tests locaux avec plusieurs clients Java et plusieurs clients Telnet ont confirmé le bon fonctionnement du serveur. Le client Java utilise `InetAddress` et `InetSocketAddress`, ce qui permet de cibler l'adresse IP d'un serveur distant sur le réseau local.
+Les tests locaux avec plusieurs clients Java et plusieurs clients Telnet ont confirmé le bon fonctionnement du serveur. Le client Java utilise `InetAddress` et `InetSocketAddress`, ce qui permet de cibler l'adresse IP d'un serveur. Le test avec l'adresse IP réseau de la machine (`192.168.1.17`) montre que le serveur reçoit bien des connexions autres que `localhost` et identifie les clients par leur adresse réelle.
 
 **Points d'attention rencontrés :**
 - Telnet n'est pas activé par défaut sous Windows et doit être activé dans les fonctionnalités Windows.
-- Les caractères accentués s'affichaient mal dans la console `cmd` (encodage). Les messages envoyés par le serveur aux clients ont donc été écrits sans accents.
-- Pour un test entre plusieurs machines, le port 1234 doit être autorisé dans le pare-feu de la machine serveur.
+- Les caractères accentués s'affichaient mal dans la console `cmd` (encodage). Les messages envoyés par le serveur aux clients ont donc été écrits sans accents, et la commande `chcp 65001` est utilisée pour l'affichage console.
+- Un seul serveur peut utiliser le port 1234 à la fois : lancer un second serveur provoque l'erreur `Address already in use: bind`.
+- Pour un test entre plusieurs machines, le réseau Wi-Fi doit être en profil « Privé » et le port 1234 doit être autorisé dans le pare-feu de la machine serveur (règle `netsh advfirewall`, à créer dans un terminal administrateur). Certains routeurs isolent aussi les appareils Wi-Fi entre eux, ce qui peut bloquer la connexion.
