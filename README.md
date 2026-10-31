@@ -145,12 +145,8 @@ Plusieurs clients sont connectés en même temps. Le serveur affiche pour chacun
 
 ![Clients Java simultanés](images/03_deux_clients_java.png)
 
-### 5.4 Clients Telnet
-Deux clients Telnet sont connectés simultanément au serveur (`telnet localhost 1234`).
 
-![Clients Telnet](images/04_telnet.jpg)
-
-### 5.5 Test avec l'adresse IP réseau
+### 5.4 Test avec l'adresse IP réseau
 Faute de seconde machine physique, le test a été réalisé sur une seule machine en utilisant son adresse IP réseau (`192.168.1.17`, obtenue avec `ipconfig`) à la place de `localhost`, avec plusieurs clients Java et un client Telnet simultanés :
 
 ```
@@ -174,17 +170,33 @@ Le serveur affiche l'adresse IP réelle des clients (`/192.168.1.17:port`) et no
 
 > **Limite :** un test avec une seconde machine physique (téléphone ou autre PC) n'a pas pu être finalisé : la connexion a été bloquée par la configuration du réseau et du pare-feu. Le client Java est néanmoins prêt pour ce scénario grâce à `InetAddress` et `InetSocketAddress` : il suffit de lancer `java Client <IP_du_serveur> 1234`.
 
+### 5.5 Test entre deux machines physiques différentes
+Le test a ensuite été réalisé avec **deux ordinateurs distincts** connectés au même réseau : le serveur tourne sur une première machine (MSI, depuis IntelliJ IDEA) et le client Java sur une seconde machine (Lenovo, depuis PowerShell). Le client est lancé avec l'adresse IP de la machine serveur :
+
+```
+java Client 10.110.121.137 1234
+```
+
+**Machine serveur** (MSI) : le serveur est en attente sur le port 1234, puis affiche la connexion du client n°1 avec l'adresse IP de l'autre machine (`/10.110.121.101:49376`) :
+
+![Machine serveur - client distant connecté](images/08_machine_serveur.jpg)
+
+**Machine client** (Lenovo) : le client se connecte au serveur `10.110.121.137:1234` et reçoit son numéro d'ordre :
+
+![Machine client - connexion au serveur distant](images/09_machine_client.jpg)
+
+Ce test confirme que le serveur accepte des connexions provenant d'une **autre machine** du réseau et identifie le client par sa véritable adresse IP (`10.110.121.101`, différente de celle du serveur `10.110.121.137`).
+
 ### Récapitulatif
 
 | Test | Résultat |
 |---|---|
 | Connexion d'un client Java | Réussi |
 | Plusieurs clients Java simultanés | Réussi |
-| Plusieurs clients Telnet simultanés | Réussi |
 | Affichage de l'IP et du numéro d'ordre côté serveur | Réussi |
 | Envoi du numéro d'ordre à chaque client | Réussi |
 | Clients Java et Telnet via l'IP réseau (192.168.1.17) | Réussi |
-| Test avec une seconde machine physique | Non réalisé |
+| Test avec une seconde machine physique | Réussi |
 
 > **Remarque :** en local (`localhost`), l'adresse du client s'affiche en IPv6 (`/[0:0:0:0:0:0:0:1]:port`). Avec l'IP réseau, elle s'affiche en IPv4 (`/192.168.1.17:port`).
 
